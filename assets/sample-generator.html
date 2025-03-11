@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF Sample Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 30px 0;
+            justify-content: center;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .sample-preview {
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: space-around;
+        }
+        .sample-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            width: 300px;
+            text-align: center;
+        }
+        .sample-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+        }
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>DXF Sample Generator</h1>
+
+    <div class="instructions">
+        <h2>Instructions</h2>
+        <p>Use this tool to generate sample DXF files for testing the DXF Optimizer application. 
+        Click on any of the buttons below to create and download different DXF sample shapes.</p>
+        <p>These files can be used as test inputs for the DXF Optimizer to validate its functionality.</p>
+    </div>
+
+    <div class="button-container">
+        <button id="createRectangle">Generate Rectangle (100x50)</button>
+        <button id="createCircle">Generate Circle (r=50)</button>
+        <button id="createLShape">Generate L-Shape (100x150)</button>
+        <button id="createGear">Generate Gear (12 teeth)</button>
+    </div>
+
+    <div class="sample-preview">
+        <div class="sample-card">
+            <h3>Rectangle</h3>
+            <div style="border: 1px solid black; width: 100px; height: 50px; margin: 0 auto;"></div>
+            <p>A simple 100x50 unit rectangle</p>
+        </div>
+        <div class="sample-card">
+            <h3>Circle</h3>
+            <div style="border: 1px solid black; width: 100px; height: 100px; border-radius: 50%; margin: 0 auto;"></div>
+            <p>A circle with 50 unit radius</p>
+        </div>
+        <div class="sample-card">
+            <h3>L-Shape</h3>
+            <div style="width: 100px; height: 150px; background: white; position: relative; margin: 0 auto;">
+                <div style="width: 100px; height: 30px; background: black;"></div>
+                <div style="width: 30px; height: 150px; background: black;"></div>
+                <div style="width: 70px; height: 120px; background: white; position: absolute; top: 30px; left: 30px;"></div>
+            </div>
+            <p>An L-shaped part (100x150)</p>
+        </div>
+        <div class="sample-card">
+            <h3>Gear</h3>
+            <svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="75" cy="75" r="60" fill="white" stroke="black" />
+                <circle cx="75" cy="75" r="20" fill="white" stroke="black" />
+                <!-- Simplified gear teeth representation -->
+                <path d="M75,15 L82,5 L90,15 M135,75 L145,82 L135,90 M75,135 L68,145 L60,135 M15,75 L5,68 L15,60
+                         M115,35 L125,28 L120,20 M115,115 L125,122 L115,130 M35,115 L25,122 L35,130 M35,35 L25,28 L35,20" 
+                      stroke="black" fill="none" />
+            </svg>
+            <p>A gear with 12 teeth</p>
+        </div>
+    </div>
+
+    <script src="sample-generator.js"></script>
+</body>
+</html>

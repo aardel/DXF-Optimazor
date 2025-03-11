@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF Optimizer</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" role="alert" aria-live="assertive"></div>
+
+    <div class="container" role="main">
+        <div class="header-container" role="banner">
+            <h1>DXF File Optimizer</h1>
+            <div class="theme-toggle" role="switch" aria-checked="false" aria-labelledby="themeLabel">
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle" aria-label="Toggle dark mode">
+                    <span class="slider round"></span>
+                </label>
+                <span id="themeLabel">Dark Mode</span>
+            </div>
+        </div>
+        
+        <div id="parts-container" role="region" aria-labelledby="partsHeading">
+            <h2 id="partsHeading">Parts</h2>
+            <div class="parts-list" id="partsList" role="list">
+                <!-- Parts will be added here dynamically -->
+                <div class="empty-state">No parts added yet. Add a DXF file below.</div>
+            </div>
+            
+            <div class="add-part-section" role="form" aria-labelledby="addPartHeading">
+                <h3 id="addPartHeading">Add New Part</h3>
+                <div class="file-upload">
+                    <label for="dxfFile">Upload DXF File:</label>
+                    <input type="file" id="dxfFile" accept=".dxf" aria-required="true">
+                </div>
+                <div class="part-options">
+                    <label for="partQuantity">Quantity:</label>
+                    <input type="number" id="partQuantity" min="1" value="1" aria-required="true">
+                </div>
+                <button id="addPartButton" class="action-button" aria-label="Add Part">Add Part</button>
+                <button id="previewBeforeUpload" class="secondary-button" aria-label="Preview File">Preview File</button>
+            </div>
+        </div>
+        
+        <div class="section-divider"></div>
+        
+        <div class="sheet-settings" role="region" aria-labelledby="sheetSettingsHeading">
+            <h2 id="sheetSettingsHeading">Sheet Settings</h2>
+            <div class="material-selection">
+                <label for="materialSelect">Material:</label>
+                <select id="materialSelect" aria-required="true">
+                    <option value="custom">Custom Size</option>
+                    <!-- Materials will be populated dynamically -->
+                </select>
+                <button id="saveMaterialBtn" class="secondary-button" aria-label="Save Current as Material">Save Current as Material</button>
+                <button id="manageMaterialsBtn" class="secondary-button" aria-label="Manage Materials">Manage Materials</button>
+            </div>
+            <div class="input-fields">
+                <label for="sheetWidth">Sheet Width (mm):</label>
+                <input type="number" id="sheetWidth" min="1" value="1000" aria-required="true">
+                
+                <label for="sheetHeight">Sheet Height (mm):</label>
+                <input type="number" id="sheetHeight" min="1" value="1000" aria-required="true">
+            </div>
+            <div class="input-fields">
+                <label for="edgeGap">Edge Gap (mm):</label>
+                <input type="number" id="edgeGap" min="0" value="10" aria-required="true">
+                
+                <label for="partSpacing">Part Spacing (mm):</label>
+                <input type="number" id="partSpacing" min="0" value="5" aria-required="true">
+            </div>
+            <div class="input-fields">
+                <label for="materialCost">Material Cost (per sheet):</label>
+                <input type="number" id="materialCost" min="0" value="0" step="0.01" aria-required="true">
+                
+                <label for="materialType">Material Type:</label>
+                <input type="text" id="materialType" placeholder="e.g. Steel, Aluminum, etc." aria-required="true">
+            </div>
+            <div class="input-fields">
+                <label for="materialThickness">Material Thickness (mm):</label>
+                <input type="number" id="materialThickness" min="0" step="0.1" aria-required="true">
+            </div>
+            <div class="options">
+                <label>
+                    <input type="checkbox" id="allowRotation" aria-label="Allow Rotation"> Allow Rotation
+                </label>
+                <label>
+                    <input type="checkbox" id="allowMirroring" aria-label="Allow Mirroring"> Allow Mirroring
+                </label>
+                <label id="customShapeContainer" style="display: none;">
+                    <input type="checkbox" id="customSheetShape" aria-label="Use Custom Sheet Shape"> Use Custom Sheet Shape
+                </label>
+            </div>
+        </div>
+        
+        <div class="button-container">
+            <button id="optimizeButton" class="primary-button" aria-label="Optimize Layout">Optimize Layout</button>
+            <div id="layoutComparisonBtn" class="layout-comparison-btn" style="display: none;">
+                <button class="secondary-button" aria-label="Compare Layouts">Compare Layouts</button>
+            </div>
+        </div>
+        
+        <div id="loadingOverlay" class="loading-overlay" role="alert" aria-live="assertive">
+            <div class="spinner" aria-hidden="true"></div>
+            <div id="progressText">Processing...</div>
+        </div>
+        
+        <div id="results" class="results-container" role="region" aria-labelledby="resultsHeading">
+            <div id="summaryResults"></div>
+            <div id="costAnalysis" class="cost-analysis" style="display:none;"></div>
+            <div id="visualResults"></div>
+        </div>
+        
+        <div class="button-group" id="downloadButtonsContainer" style="display:none;">
+            <button id="downloadAllButton" class="action-button" aria-label="Download All Sheets">Download All Sheets</button>
+            <button id="downloadPrintPDF" class="action-button" aria-label="Download Print-Ready PDF">Download Print-Ready PDF</button>
+            <div id="individualDownloads"></div>
+        </div>
+    </div>
+    
+    <!-- Material Form Modal -->
+    <div id="materialModal" class="modal" role="dialog" aria-labelledby="materialModalHeading" aria-modal="true">
+        <div class="modal-content">
+            <span class="close-modal" role="button" aria-label="Close">&times;</span>
+            <h3 id="materialModalHeading">Add New Material</h3>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="materialName">Name:</label>
+                    <input type="text" id="materialName" placeholder="Material Name" aria-required="true">
+                </div>
+                <div class="form-group">
+                    <label for="materialWidth">Width (mm):</label>
+                    <input type="number" id="materialWidth" min="1" aria-required="true">
+                </div>
+                <div class="form-group">
+                    <label for="materialHeight">Height (mm):</label>
+                    <input type="number" id="materialHeight" min="1" aria-required="true">
+                </div>
+                <div class="form-group">
+                    <label for="materialDescription">Description (optional):</label>
+                    <input type="text" id="materialDescription" placeholder="Description">
+                </div>
+                <div class="form-group">
+                    <label for="materialCostInput">Cost (optional):</label>
+                    <input type="number" id="materialCostInput" min="0" step="0.01">
+                </div>
+                <div class="form-actions">
+                    <button id="saveMaterialFormBtn" class="action-button" aria-label="Save Material">Save Material</button>
+                    <button id="cancelMaterialBtn" class="secondary-button" aria-label="Cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal" role="dialog" aria-labelledby="previewModalHeading" aria-modal="true">
+        <div class="modal-content modal-lg">
+            <span class="close-modal" role="button" aria-label="Close">&times;</span>
+            <h3 id="previewModalHeading">DXF Preview</h3>
+            <div class="preview-container">
+                <canvas id="previewCanvas" class="dxf-preview-canvas" role="img" aria-label="DXF Preview"></canvas>
+            </div>
+            <div class="preview-actions">
+                <button id="acceptPreviewBtn" class="action-button" aria-label="Accept and Add Part">Accept & Add Part</button>
+                <button id="cancelPreviewBtn" class="secondary-button" aria-label="Cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Layout Comparison Modal -->
+    <div id="comparisonModal" class="modal" role="dialog" aria-labelledby="comparisonModalHeading" aria-modal="true">
+        <div class="modal-content modal-lg">
+            <span class="close-modal" role="button" aria-label="Close">&times;</span>
+            <h3 id="comparisonModalHeading">Layout Comparison</h3>
+            <div class="comparison-container">
+                <div class="comparison-layout" id="comparisonLayout1" role="region" aria-labelledby="currentLayoutHeading">
+                    <h4 id="currentLayoutHeading">Current Layout</h4>
+                    <div class="comparison-stats"></div>
+                    <div class="comparison-visual"></div>
+                </div>
+                <div class="comparison-layout" id="comparisonLayout2" role="region" aria-labelledby="previousLayoutHeading">
+                    <h4 id="previousLayoutHeading">Previous Layout</h4>
+                    <div class="comparison-stats"></div>
+                    <div class="comparison-visual"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Material Management Modal -->
+    <div id="manageMaterialsModal" class="modal" role="dialog" aria-labelledby="manageMaterialsModalHeading" aria-modal="true">
+        <div class="modal-content">
+            <span class="close-modal" role="button" aria-label="Close">&times;</span>
+            <h3 id="manageMaterialsModalHeading">Manage Materials</h3>
+            <div id="materialsList" class="materials-list"></div>
+        </div>
+    </div>
+    
+    <!-- Adding DXF.js library for parsing DXF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.0.0/dist/dxf-parser.js"></script>
+    
+    <script src="js/app.js"></script>
+    <script src="js/optimizer.js"></script>
+</body>
+</html>
