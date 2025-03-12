@@ -1123,15 +1123,115 @@ class DXFParser {
     }
 
     approximateSpline(spline) {
-        // Simple spline approximation - in real implementation would use proper spline interpolation
-        if (!spline.controlPoints) return [];
-        return spline.controlPoints.map(pt => ({
-            x: pt.x,
-            y: pt.y,
-            z: pt.z || 0
-        }));
+        // More advanced spline approximation using De Boor's algorithm for NURBS
+        if (!spline.controlPoints || spline.controlPoints.length === 0) return [];
+        
+        const numPoints = 100; // Number of points to generate along the spline
+        const vertices = [];
+        
+        // Check if we have degree info, if not assume cubic (degree 3)
+        const degree = spline.degree || 3;
+        
+        // Generate knot vector if not provided
+        let knots = spline.knots || [];
+        if (knots.length === 0) {
+            // Create a uniform knot vector
+            const numKnots = spline.controlPoints.length + degree + 1;
+            knots = Array.from({ length: numKnots }, (_, i) => i);
+        }
+        
+        // Create a normalized parameter space
+        const minKnot = knots[degree];
+        const maxKnot = knots[knots.length - 1 - degree];
+        
+        // Generate points along the spline
+        for (let i = 0; i < numPoints; i++) {
+            const t = minKnot + (i / (numPoints - 1)) * (maxKnot - minKnot);
+            const pt = this.evaluateNurbsPoint(t, degree, spline.controlPoints, knots);
+            vertices.push(pt);
+        }
+        
+        return vertices;
     }
-
+    
+    /**
+     * Evaluate a point on a NURBS curve at parameter t
+     */
+    evaluateNurbsPoint(t, degree, controlPoints, knots) {
+        // Find the span containing t
+        const span = this.findSpan(t, degree, knots);
+        
+        // Calculate basis functions
+        const basis = this.basisFunctions(span, t, degree, knots);
+        
+        // Calculate point
+        const point = { x: 0, y: 0, z: 0 };
+        
+        for (let i = 0; i <= degree; i++) {
+            const cp = controlPoints[span - degree + i];
+            if (cp) {
+                const weight = basis[i];
+                point.x += weight * cp.x;
+                point.y += weight * cp.y;
+                point.z += weight * (cp.z || 0);
+            }
+        }
+        
+        return point;
+    }
+    
+    /**
+     * Find the knot span index for parameter t
+     */
+    findSpan(t, degree, knots) {
+        const n = knots.length - degree - 2;
+        
+        // Handle edge cases
+        if (t >= knots[n + 1]) return n;
+        if (t <= knots[degree]) return degree;
+        
+        // Binary search
+        let low = degree;
+        let high = n + 1;
+        let mid = Math.floor((low + high) / 2);
+        
+        while (t < knots[mid] || t >= knots[mid + 1]) {
+            if (t < knots[mid]) {
+                high = mid;
+            } else {
+                low = mid;
+            }
+            mid = Math.floor((low + high) / 2);
+        }
+        
+        return mid;
+    }
+    
+    /**
+     * Calculate the nonzero basis functions at parameter t
+     */
+    basisFunctions(span, t, degree, knots) {
+        const basis = [1.0];
+        const left = new Array(degree + 1);
+        const right = new Array(degree + 1);
+        
+        for (let j = 1; j <= degree; j++) {
+            left[j] = t - knots[span + 1 - j];
+            right[j] = knots[span + j] - t;
+            let saved = 0.0;
+            
+            for (let r = 0; r < j; r++) {
+                const temp = basis[r] / (right[r + 1] + left[j - r]);
+                basis[r] = saved + right[r + 1] * temp;
+                saved = left[j - r] * temp;
+            }
+            
+            basis[j] = saved;
+        }
+        
+        return basis;
+    }
+    
     approximateEllipse(ellipse) {
         const segments = 32; // Number of segments to approximate ellipse
         const vertices = [];

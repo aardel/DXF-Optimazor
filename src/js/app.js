@@ -1,3 +1,6 @@
+import DXFOptimizer from './optimizer.js';
+import DXFImporter from './dxfImporter';
+
 /**
  * DXF Optimizer - Main Application
  * Handles user interactions, file operations, and visualization
@@ -162,35 +165,67 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.fillText('DXF Preview', canvas.width / 2 - 30, canvas.height / 2);
     }
 
+    const dxfImporter = new DXFImporter();
+
     async function handleFileChange(event) {
         const file = event.target.files[0];
         if (file) {
-            currentFile = file;
-            const dimensions = await getFileDimensions(file);
-            updateFileInfoDisplay(file.name, dimensions);
+            try {
+                currentFile = file;
+                const dxfData = await dxfImporter.importDXF(file);
+                const dimensions = calculateDimensions(dxfData);
+                updateFileInfoDisplay(file.name, dimensions);
+            } catch (error) {
+                console.error('Error importing DXF file:', error);
+                showError('Failed to import DXF file. Please ensure it is a valid DXF format.');
+            }
         }
     }
 
-    function getFileDimensions(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const dxfContent = e.target.result;
-                const parser = new window.DxfParser();
-                const dxfData = parser.parseSync(dxfContent);
-                const dimensions = calculateDimensions(dxfData);
-                resolve(dimensions);
-            };
-            reader.onerror = function() {
-                reject(new Error("Failed to read file"));
-            };
-            reader.readAsText(file);
-        });
-    }
-
     function calculateDimensions(dxfData) {
-        // Implement the logic to calculate dimensions from dxfData
-        return { width: 100, height: 50 }; // Example dimensions
+        if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+            throw new Error('Invalid DXF data: No entities found');
+        }
+    
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+    
+        // Iterate through all entities to find the bounding box
+        dxfData.entities.forEach(entity => {
+            if (entity.vertices) {
+                entity.vertices.forEach(vertex => {
+                    minX = Math.min(minX, vertex.x);
+                    minY = Math.min(minY, vertex.y);
+                    maxX = Math.max(maxX, vertex.x);
+                    maxY = Math.max(maxY, vertex.y);
+                });
+            } else if (entity.center) {
+                // For circles and arcs
+                const radius = entity.radius || 0;
+                minX = Math.min(minX, entity.center.x - radius);
+                minY = Math.min(minY, entity.center.y - radius);
+                maxX = Math.max(maxX, entity.center.x + radius);
+                maxY = Math.max(maxY, entity.center.y + radius);
+            } else if (entity.position) {
+                // For points and other simple entities
+                minX = Math.min(minX, entity.position.x);
+                minY = Math.min(minY, entity.position.y);
+                maxX = Math.max(maxX, entity.position.x);
+                maxY = Math.max(maxY, entity.position.y);
+            }
+        });
+    
+        // Apply a scale factor - we default to assuming mm
+        const scaleFactor = 1; // You could determine this from header info in a more complete implementation
+    
+        return {
+            width: Math.ceil((maxX - minX) * scaleFactor),
+            height: Math.ceil((maxY - minY) * scaleFactor),
+            minX: minX,
+            minY: minY,
+            maxX: maxX,
+            maxY: maxY
+        };
     }
 
     async function handlePreviewFile() {
@@ -706,682 +741,1062 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderDXFPreview(file) {
-        // Implementation for rendering DXF preview
-    }
-
-    function loadSavedMaterials() {
-        // Implementation for loading saved materials
-    }
-
-    function saveMaterialToStorage(name, width, height) {
-        // Implementation for saving material to storage
-    }
-
-    function optimizeLayout() {
-        // Implementation for optimizing layout
-        // This may be defined in optimizer.js instead
-    }
-});
-
-// Wait for DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize UI elements and event listeners
-    initializeDarkMode();
-    initializeEventListeners();
-    
-    // Hide the loading overlay initially
-    hideLoadingOverlay();
-});
-
-// Initialize dark mode based on saved preference
-function initializeDarkMode() {
-    const isDarkMode = localStorage.getItem('darkMode') === 'true';
-    if (isDarkMode) {
-        document.body.classList.add('dark-mode');
-        document.getElementById('darkModeToggle').checked = true;
-    }
-}
-
-// Set up all event listeners
-function initializeEventListeners() {
-    // Dark mode toggle
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('change', function() {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-        });
-    }
-    
-    // Part management
-    const addPartButton = document.getElementById('addPartButton');
-    if (addPartButton) {
-        addPartButton.addEventListener('click', handleAddPart);
-    }
-    
-    const previewButton = document.getElementById('previewBeforeUpload');
-    if (previewButton) {
-        previewButton.addEventListener('click', handlePreviewDXF);
-    }
-    
-    // Material management
-    const saveMaterialBtn = document.getElementById('saveMaterialBtn');
-    if (saveMaterialBtn) {
-        saveMaterialBtn.addEventListener('click', openSaveMaterialDialog);
-    }
-    
-    const manageMaterialsBtn = document.getElementById('manageMaterialsBtn');
-    if (manageMaterialsBtn) {
-        manageMaterialsBtn.addEventListener('click', openManageMaterialsDialog);
-    }
-    
-    // Optimization
-    const optimizeButton = document.getElementById('optimizeButton');
-    if (optimizeButton) {
-        optimizeButton.addEventListener('click', startOptimization);
-    }
-    
-    // Layout comparison
-    const layoutComparisonBtn = document.querySelector('#layoutComparisonBtn button');
-    if (layoutComparisonBtn) {
-        layoutComparisonBtn.addEventListener('click', openLayoutComparison);
-    }
-    
-    // Download buttons
-    const downloadAllButton = document.getElementById('downloadAllButton');
-    if (downloadAllButton) {
-        downloadAllButton.addEventListener('click', downloadAllSheets);
-    }
-    
-    const downloadPdfButton = document.getElementById('downloadPrintPDF');
-    if (downloadPdfButton) {
-        downloadPdfButton.addEventListener('click', downloadAsPDF);
-    }
-    
-    // Modal buttons
-    setupModalEventListeners();
-}
-
-// Set up event listeners for all modal dialogs
-function setupModalEventListeners() {
-    // Close buttons for all modals
-    document.querySelectorAll('.close-modal').forEach(button => {
-        button.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal) modal.style.display = 'none';
-        });
-    });
-    
-    // Material modal buttons
-    const saveMaterialFormBtn = document.getElementById('saveMaterialFormBtn');
-    if (saveMaterialFormBtn) {
-        saveMaterialFormBtn.addEventListener('click', saveMaterial);
-    }
-    
-    const cancelMaterialBtn = document.getElementById('cancelMaterialBtn');
-    if (cancelMaterialBtn) {
-        cancelMaterialBtn.addEventListener('click', closeMaterialModal);
-    }
-    
-    // Preview modal buttons
-    const acceptPreviewBtn = document.getElementById('acceptPreviewBtn');
-    if (acceptPreviewBtn) {
-        acceptPreviewBtn.addEventListener('click', acceptAndAddPart);
-    }
-    
-    const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
-    if (cancelPreviewBtn) {
-        cancelPreviewBtn.addEventListener('click', closePreviewModal);
-    }
-}
-
-// Loading overlay functions
-function showLoadingOverlay(message = "Processing...") {
-    document.getElementById('progressText').textContent = message;
-    document.getElementById('loadingOverlay').style.display = 'flex';
-}
-
-function hideLoadingOverlay() {
-    document.getElementById('loadingOverlay').style.display = 'none';
-}
-
-function updateLoadingProgress(message) {
-    document.getElementById('progressText').textContent = message;
-}
-
-// Toast notification system
-function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    toast.setAttribute('role', 'alert');
-    
-    toastContainer.appendChild(toast);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => {
-            toastContainer.removeChild(toast);
-        }, 500);
-    }, 3000);
-}
-
-// Button handler functions
-function handleAddPart() {
-    const fileInput = document.getElementById('dxfFile');
-    const quantityInput = document.getElementById('partQuantity');
-    
-    if (!fileInput.files.length) {
-        showToast("Please select a DXF file first", "error");
-        return;
-    }
-    
-    const quantity = parseInt(quantityInput.value) || 1;
-    if (quantity < 1) {
-        showToast("Quantity must be at least 1", "error");
-        return;
-    }
-    
-    showLoadingOverlay("Processing DXF file...");
-    processDXFFile(fileInput.files[0], quantity);
-}
-
-function handlePreviewDXF() {
-    const fileInput = document.getElementById('dxfFile');
-    
-    if (!fileInput.files.length) {
-        showToast("Please select a DXF file first", "error");
-        return;
-    }
-    
-    showLoadingOverlay("Generating preview...");
-    
-    try {
-        // Open the preview modal and render the DXF file
-        const previewModal = document.getElementById('previewModal');
-        previewModal.style.display = 'block';
-        
-        renderDXFPreview(fileInput.files[0]).then(() => {
-            hideLoadingOverlay();
-        }).catch(error => {
-            hideLoadingOverlay();
-            showToast("Failed to preview DXF: " + error.message, "error");
-            closePreviewModal();
-        });
-    } catch (error) {
-        hideLoadingOverlay();
-        showToast("Failed to preview DXF: " + error.message, "error");
-    }
-}
-
-function openSaveMaterialDialog() {
-    // Pre-fill with current sheet values
-    document.getElementById('materialWidth').value = document.getElementById('sheetWidth').value || '';
-    document.getElementById('materialHeight').value = document.getElementById('sheetHeight').value || '';
-    document.getElementById('materialCostInput').value = document.getElementById('materialCost').value || '';
-    document.getElementById('materialName').value = '';
-    document.getElementById('materialDescription').value = '';
-    
-    // Show the modal
-    document.getElementById('materialModal').style.display = 'block';
-}
-
-function openManageMaterialsDialog() {
-    // Load saved materials into the materials list
-    loadSavedMaterials();
-    
-    // Show the modal
-    document.getElementById('manageMaterialsModal').style.display = 'block';
-}
-
-function startOptimization() {
-    // Verify there are parts to optimize
-    const partsList = document.getElementById('partsList');
-    if (!partsList.querySelector('.part-item')) {
-        showToast("Please add at least one part before optimizing", "error");
-        return;
-    }
-    
-    showLoadingOverlay("Starting optimization...");
-    
-    // Call the optimizer function (from optimizer.js)
-    try {
-        optimizeLayout();
-        document.getElementById('results').style.display = 'block';
-        document.getElementById('downloadButtonsContainer').style.display = 'block';
-        document.getElementById('layoutComparisonBtn').style.display = 'block';
-    } catch (error) {
-        showToast("Optimization failed: " + error.message, "error");
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-function openLayoutComparison() {
-    // Load comparison data if available
-    const comparisonModal = document.getElementById('comparisonModal');
-    comparisonModal.style.display = 'block';
-}
-
-function downloadAllSheets() {
-    showLoadingOverlay("Preparing sheets for download...");
-    
-    // Simulate download process
-    setTimeout(() => {
-        hideLoadingOverlay();
-        showToast("All sheets downloaded successfully", "success");
-    }, 1000);
-}
-
-function downloadAsPDF() {
-    showLoadingOverlay("Generating PDF...");
-    
-    // Simulate PDF generation
-    setTimeout(() => {
-        hideLoadingOverlay();
-        showToast("PDF generated successfully", "success");
-    }, 1000);
-}
-
-// Modal action functions
-function saveMaterial() {
-    const name = document.getElementById('materialName').value.trim();
-    const width = parseFloat(document.getElementById('materialWidth').value);
-    const height = parseFloat(document.getElementById('materialHeight').value);
-    const description = document.getElementById('materialDescription').value.trim();
-    const cost = parseFloat(document.getElementById('materialCostInput').value) || 0;
-    
-    if (!name) {
-        showToast("Please enter a material name", "error");
-        return;
-    }
-    
-    if (isNaN(width) || width <= 0 || isNaN(height) || height <= 0) {
-        showToast("Please enter valid dimensions", "error");
-        return;
-    }
-    
-    // Save the material (implementation depends on your storage method)
-    const material = {
-        name,
-        width,
-        height,
-        description,
-        cost
-    };
-    
-    // Get existing materials from localStorage
-    let materials = JSON.parse(localStorage.getItem('materials') || '[]');
-    materials.push(material);
-    localStorage.setItem('materials', JSON.stringify(materials));
-    
-    // Update the material dropdown
-    updateMaterialDropdown();
-    
-    // Close the modal and show confirmation
-    closeMaterialModal();
-    showToast("Material saved successfully", "success");
-}
-
-function closeMaterialModal() {
-    document.getElementById('materialModal').style.display = 'none';
-}
-
-function acceptAndAddPart() {
-    closePreviewModal();
-    handleAddPart();
-}
-
-function closePreviewModal() {
-    document.getElementById('previewModal').style.display = 'none';
-}
-
-// Helper functions
-function processDXFFile(file, quantity) {
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        try {
-            const dxfContent = e.target.result;
-            
-            // Parse the DXF data (using dxf-parser library)
-            const parser = new window.DxfParser();
-            const dxfData = parser.parseSync(dxfContent);
-            
-            // Add the part to the parts list
-            addPartToList(file.name, dxfData, quantity);
-            
-            // Clear the file input
-            document.getElementById('dxfFile').value = '';
-            
-            hideLoadingOverlay();
-            showToast(`Part "${file.name}" added successfully`, "success");
-        } catch (error) {
-            hideLoadingOverlay();
-            showToast("Failed to process DXF: " + error.message, "error");
-        }
-    };
-    
-    reader.onerror = function() {
-        hideLoadingOverlay();
-        showToast("Error reading file", "error");
-    };
-    
-    reader.readAsText(file);
-}
-
-function addPartToList(filename, dxfData, quantity) {
-    const partsList = document.getElementById('partsList');
-    const emptyState = partsList.querySelector('.empty-state');
-    if (emptyState) {
-        partsList.removeChild(emptyState);
-    }
-    
-    // Generate a unique ID for this part
-    const partId = 'part_' + Date.now();
-    
-    // Create part element
-    const partElement = document.createElement('div');
-    partElement.className = 'part-item';
-    partElement.dataset.id = partId;
-    partElement.dataset.dxf = JSON.stringify(dxfData);
-    
-    partElement.innerHTML = `
-        <div class="part-info">
-            <span class="part-name">${filename}</span>
-            <span class="part-dimensions">Dimensions: ${dxfData.header.$EXTMIN[0]} x ${dxfData.header.$EXTMIN[1]}</span>
-            <div class="part-quantity">
-                <button class="quantity-control" onclick="decreaseQuantity('${partId}')">-</button>
-                <span>${quantity}</span>
-                <button class="quantity-control" onclick="increaseQuantity('${partId}')">+</button>
-            </div>
-        </div>
-        <div class="part-actions">
-            <button class="remove-part" onclick="removePart('${partId}')">Delete</button>
-        </div>
-    `;
-    
-    // Add event listeners for the part actions
-    partElement.querySelector('.remove-part').addEventListener('click', function() {
-        partsList.removeChild(partElement);
-        if (partsList.children.length === 0) {
-            partsList.innerHTML = '<div class="empty-state">No parts added yet. Add a DXF file below.</div>';
-        }
-        showToast(`Part "${filename}" removed`, "info");
-    });
-    
-    partElement.querySelector('.edit-part').addEventListener('click', function() {
-        // Implementation for editing a part
-        showToast("Edit functionality not implemented yet", "info");
-    });
-    
-    partsList.appendChild(partElement);
-}
-
-function renderDXFPreview(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            try {
-                const dxfContent = e.target.result;
-                
-                // Parse the DXF
-                const parser = new window.DxfParser();
-                const dxfData = parser.parseSync(dxfContent);
-                
-                // Get the canvas and draw the preview
-                const canvas = document.getElementById('previewCanvas');
-                drawDXFOnCanvas(canvas, dxfData);
-                
-                resolve();
-            } catch (error) {
-                reject(error);
-            }
-        };
-        
-        reader.onerror = function() {
-            reject(new Error("Failed to read file"));
-        };
-        
-        reader.readAsText(file);
-    });
-}
-
-function drawDXFOnCanvas(canvas, dxfData) {
-    const ctx = canvas.getContext('2d');
-    
-    // Clear the canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const entities = dxfData.entities;
-    entities.forEach(entity => {
-        if (entity.type === 'LINE') {
-            ctx.beginPath();
-            ctx.moveTo(entity.vertices[0].x, entity.vertices[0].y);
-            ctx.lineTo(entity.vertices[1].x, entity.vertices[1].y);
-            ctx.stroke();
-        } else if (entity.type === 'CIRCLE') {
-            ctx.beginPath();
-            ctx.arc(entity.center.x, entity.center.y, entity.radius, 0, 2 * Math.PI);
-            ctx.stroke();
-        } else if (entity.type === 'ARC') {
-            ctx.beginPath();
-            ctx.arc(entity.center.x, entity.center.y, entity.radius, entity.startAngle, entity.endAngle);
-            ctx.stroke();
-        } else if (entity.type === 'POLYLINE') {
-            ctx.beginPath();
-            entity.vertices.forEach((vertex, index) => {
-                if (index === 0) {
-                    ctx.moveTo(vertex.x, vertex.y);
-                } else {
-                    ctx.lineTo(vertex.x, vertex.y);
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dxfContent = e.target.result;
+                    const parser = new window.DxfParser();
+                    const dxfData = parser.parseSync(dxfContent);
+                    const canvas = document.getElementById('previewCanvas');
+                    drawDXFOnCanvas(canvas, dxfData);
+                    resolve();
+                } catch (error) {
+                    reject(error);
                 }
-            });
-            if (entity.closed) {
-                ctx.closePath();
-            }
-            ctx.stroke();
-        }
-    });
-}
-
-function loadSavedMaterials() {
-    const materialsList = document.getElementById('materialsList');
-    materialsList.innerHTML = '';
-    
-    // Load materials from localStorage
-    const materials = JSON.parse(localStorage.getItem('materials') || '[]');
-    
-    if (materials.length === 0) {
-        materialsList.innerHTML = '<div class="empty-state">No saved materials yet.</div>';
-        return;
+            };
+            reader.onerror = function() {
+                reject(new Error('Failed to read file'));
+            };
+            reader.readAsText(file);
+        });
     }
-    
-    materials.forEach((material, index) => {
-        const materialElement = document.createElement('div');
-        materialElement.className = 'material-item';
+
+    function openSaveMaterialModal() {
+        console.log('Opening save material modal...');
+        const modal = document.getElementById('materialModal');
         
-        materialElement.innerHTML = `
-            <div class="material-info">
-                <span class="material-name">${material.name}</span>
-                <span class="material-dimensions">${material.width} mm × ${material.height} mm</span>
-                ${material.description ? `<span class="material-description">${material.description}</span>` : ''}
+        // Pre-fill with current sheet values
+        document.getElementById('materialWidth').value = document.getElementById('sheetWidth').value;
+        document.getElementById('materialHeight').value = document.getElementById('sheetHeight').value;
+        
+        modal.style.display = 'block';
+    }
+
+    function openManageMaterialsModal() {
+        console.log('Opening manage materials modal...');
+        const modal = document.getElementById('manageMaterialsModal');
+        loadSavedMaterials();
+        modal.style.display = 'block';
+    }
+
+    function startOptimization() {
+        console.log('Starting optimization...');
+        showLoadingOverlay('Optimizing layout...');
+        
+        // Call optimization function here
+        try {
+            optimizeLayout();
+            document.getElementById('downloadButtonsContainer').style.display = 'flex';
+            document.getElementById('layoutComparisonBtn').style.display = 'block';
+        } catch (error) {
+            showToast('Optimization failed: ' + error.message, 'error');
+        } finally {
+            hideLoadingOverlay();
+        }
+    }
+
+    function showLayoutComparison() {
+        console.log('Showing layout comparison...');
+        const modal = document.getElementById('comparisonModal');
+        modal.style.display = 'block';
+        // Populate comparison data
+    }
+
+    function downloadAllSheets() {
+        console.log('Downloading all sheets...');
+        showLoadingOverlay('Preparing downloads...');
+        
+        // Implementation for downloading all sheets
+        setTimeout(() => {
+            hideLoadingOverlay();
+            showToast('All sheets downloaded successfully', 'success');
+        }, 1000);
+    }
+
+    function downloadAsPDF() {
+        console.log('Downloading as PDF...');
+        showLoadingOverlay('Generating PDF...');
+        
+        // Implementation for downloading as PDF
+        setTimeout(() => {
+            hideLoadingOverlay();
+            showToast('PDF generated successfully', 'success');
+        }, 1000);
+    }
+
+    function acceptPreviewAndAddPart() {
+        console.log('Accepting preview and adding part...');
+        // Add the part from the preview
+        addPart();
+        closePreviewModal();
+    }
+
+    function closePreviewModal() {
+        console.log('Closing preview modal...');
+        const modal = document.getElementById('previewModal');
+        modal.style.display = 'none';
+    }
+
+    function saveMaterial() {
+        console.log('Saving material...');
+        const name = document.getElementById('materialName').value;
+        const width = document.getElementById('materialWidth').value;
+        const height = document.getElementById('materialHeight').value;
+        
+        if (!name || !width || !height) {
+            showToast('Please fill out all required fields', 'error');
+            return;
+        }
+        
+        // Save material to local storage
+        saveMaterialToStorage(name, width, height);
+        closeMaterialModal();
+        showToast('Material saved successfully', 'success');
+    }
+
+    function closeMaterialModal() {
+        console.log('Closing material modal...');
+        const modal = document.getElementById('materialModal');
+        modal.style.display = 'none';
+    }
+
+    function toggleDarkMode() {
+        console.log('Toggling dark mode...');
+        document.body.classList.toggle('dark-mode');
+        
+        // Save preference to local storage
+        const isDarkMode = document.body.classList.contains('dark-mode');
+        localStorage.setItem('darkMode', isDarkMode);
+    }
+
+    function showToast(message, type = 'info') {
+        console.log('Showing toast:', message, type);
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        toastContainer.appendChild(toast);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            setTimeout(() => {
+                toast.remove();
+            }, 500);
+        }, 3000);
+    }
+
+    // Helper function stubs (implement these as needed)
+    function processDXFFile(file, quantity) {
+        // Implementation for processing DXF file
+    }
+
+    function renderDXFPreview(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dxfContent = e.target.result;
+                    const parser = new window.DxfParser();
+                    const dxfData = parser.parseSync(dxfContent);
+                    const canvas = document.getElementById('previewCanvas');
+                    drawDXFOnCanvas(canvas, dxfData);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = function() {
+                reject(new Error('Failed to read file'));
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    function addPartToList(filename, dxfData, quantity) {
+        // Create a unique ID for the part
+        const partId = 'part-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+        
+        // Convert quantity to number
+        const partQuantity = parseInt(quantity) || 1;
+        
+        // Ensure the parts list container is not in the "empty" state
+        const partsList = document.getElementById('partsList');
+        if (partsList.children.length === 1 && partsList.children[0].classList.contains('empty-state')) {
+            partsList.innerHTML = '';
+        }
+
+        // Extract entities and validate the DXF data
+        let entities = dxfData.entities || [];
+        
+        // Ensure we have valid dimensions
+        let dimensions;
+        try {
+            dimensions = calculateDimensions(dxfData);
+        } catch (error) {
+            console.error("Failed to calculate dimensions:", error);
+            showToast(`Failed to process part "${filename}": Invalid dimensions`, "error");
+            return;
+        }
+
+        // Create the part object
+        const part = {
+            id: partId,
+            filename: filename,
+            dimensions: dimensions,
+            quantity: partQuantity,
+            entities: entities,
+            dxfData: dxfData
+        };
+        
+        // Add the part to the internal list
+        partsList.push(part);
+        
+        // Create the part element in the UI
+        const partElement = document.createElement('div');
+        partElement.className = 'part-item';
+        partElement.id = partId;
+        
+        // Create preview canvas
+        const previewCanvas = document.createElement('canvas');
+        previewCanvas.width = 120;
+        previewCanvas.height = 120;
+        drawDXFOnCanvas(previewCanvas, dxfData);
+        
+        partElement.innerHTML = `
+            <div class="part-preview">
+                ${previewCanvas.outerHTML}
             </div>
-            <div class="material-actions">
-                <button class="select-material" data-index="${index}">Select</button>
-                <button class="delete-material" data-index="${index}">Delete</button>
+            <div class="part-info">
+                <div class="part-name">${filename}</div>
+                <div class="part-dimensions">
+                    ${dimensions.width.toFixed(2)}mm × ${dimensions.height.toFixed(2)}mm
+                </div>
+                <div class="quantity-control-wrapper">
+                    <button class="quantity-control" onclick="decreaseQuantity('${partId}')">-</button>
+                    <span class="quantity" id="quantity-${partId}">${partQuantity}</span>
+                    <button class="quantity-control" onclick="increaseQuantity('${partId}')">+</button>
+                </div>
+            </div>
+            <div class="part-actions">
+                <button class="remove-part" onclick="removePart('${partId}')">Delete</button>
             </div>
         `;
         
-        materialsList.appendChild(materialElement);
-    });
-    
-    // Add event listeners to the buttons
-    document.querySelectorAll('.select-material').forEach(button => {
-        button.addEventListener('click', function() {
-            const index = parseInt(this.dataset.index);
-            selectMaterial(materials[index]);
-            document.getElementById('manageMaterialsModal').style.display = 'none';
-        });
-    });
-    
-    document.querySelectorAll('.delete-material').forEach(button => {
-        button.addEventListener('click', function() {
-            const index = parseInt(this.dataset.index);
-            materials.splice(index, 1);
-            localStorage.setItem('materials', JSON.stringify(materials));
-            loadSavedMaterials();
-            showToast("Material deleted", "info");
-        });
-    });
-}
-
-function selectMaterial(material) {
-    document.getElementById('sheetWidth').value = material.width;
-    document.getElementById('sheetHeight').value = material.height;
-    document.getElementById('materialCost').value = material.cost || 0;
-    document.getElementById('materialType').value = material.description || '';
-}
-
-function updateMaterialDropdown() {
-    const materialSelect = document.getElementById('materialSelect');
-    materialSelect.innerHTML = '';
-    const materials = JSON.parse(localStorage.getItem('materials') || '[]');
-    materials.forEach((material, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = `${material.name} (${material.width}×${material.height}mm)`;
-        materialSelect.appendChild(option);
-    });
-    materialSelect.onchange = function() {
-        if (this.value === 'custom') return;
-        const index = parseInt(this.value);
-        selectMaterial(materials[index]);
-    };
-}
-
-// Initialize materials on page load
-function initializeMaterials() {
-    updateMaterialDropdown();
-}
-
-function renderDXFPreview(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const dxfContent = e.target.result;
-                const parser = new window.DxfParser();
-                const dxfData = parser.parseSync(dxfContent);
-                const canvas = document.getElementById('previewCanvas');
-                drawDXFOnCanvas(canvas, dxfData);
-                resolve();
-            } catch (error) {
-                reject(error);
+        // Add event listeners for the part actions
+        partElement.querySelector('.remove-part').addEventListener('click', function() {
+            partsList.removeChild(partElement);
+            if (partsList.children.length === 0) {
+                partsList.innerHTML = '<div class="empty-state">No parts added yet. Add a DXF file below.</div>';
             }
-        };
-        reader.onerror = function() {
-            reject(new Error('Failed to read file'));
-        };
-        reader.readAsText(file);
-    });
-}
-
-function addPartToList(filename, dxfData, quantity) {
-    const partsList = document.getElementById('partsList');
-    const emptyState = partsList.querySelector('.empty-state');
-    if (emptyState) {
-        partsList.removeChild(emptyState);
+            showToast(`Part "${filename}" removed`, "info");
+        });
+        
+        partsList.appendChild(partElement);
     }
-    const partId = 'part_' + Date.now();
-    const partElement = document.createElement('div');
-    partElement.className = 'part-item';
-    partElement.dataset.id = partId;
-    partElement.dataset.dxf = JSON.stringify(dxfData);
-    partElement.innerHTML = `
-        <div class="part-info">
-            <span class="part-name">${filename}</span>
-            <span class="part-dimensions">Dimensions: ${dxfData.header.$EXTMIN[0]} x ${dxfData.header.$EXTMIN[1]}</span>
-            <div class="part-quantity">
-                <button class="quantity-control" onclick="decreaseQuantity('${partId}')">-</button>
-                <span>${quantity}</span>
-                <button class="quantity-control" onclick="increaseQuantity('${partId}')">+</button>
-            </div>
-        </div>
-        <div class="part-actions">
-            <button class="remove-part" onclick="removePart('${partId}')">Delete</button>
-        </div>
-    `;
-    partsList.appendChild(partElement);
-}
 
-function removePart(partId) {
-    const partElement = document.querySelector(`[data-id='${partId}']`);
-    if (partElement) {
-        partElement.remove();
-        const partsList = document.getElementById('partsList');
-        if (partsList.children.length === 0) {
-            partsList.innerHTML = '<div class="empty-state">No parts added yet. Add a DXF file below.</div>';
+    function calculateDimensions(dxfData) {
+        if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+            throw new Error("Invalid DXF data: No entities found");
         }
-    }
-}
 
-function increaseQuantity(partId) {
-    const partElement = document.querySelector(`[data-id='${partId}']`);
-    if (partElement) {
-        const quantitySpan = partElement.querySelector('.part-quantity span');
-        let quantity = parseInt(quantitySpan.textContent);
-        quantity += 1;
-        quantitySpan.textContent = quantity;
-    }
-}
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
 
-function decreaseQuantity(partId) {
-    const partElement = document.querySelector(`[data-id='${partId}']`);
-    if (partElement) {
-        const quantitySpan = partElement.querySelector('.part-quantity span');
-        let quantity = parseInt(quantitySpan.textContent);
-        if (quantity > 1) {
-            quantity -= 1;
-            quantitySpan.textContent = quantity;
+        // Iterate through all entities to find the bounding box
+        dxfData.entities.forEach(entity => {
+            if (entity.vertices) {
+                entity.vertices.forEach(vertex => {
+                    minX = Math.min(minX, vertex.x);
+                    minY = Math.min(minY, vertex.y);
+                    maxX = Math.max(maxX, vertex.x);
+                    maxY = Math.max(maxY, vertex.y);
+                });
+            } else if (entity.center) {
+                // For circles and arcs
+                const radius = entity.radius || 0;
+                minX = Math.min(minX, entity.center.x - radius);
+                minY = Math.min(minY, entity.center.y - radius);
+                maxX = Math.max(maxX, entity.center.x + radius);
+                maxY = Math.max(maxY, entity.center.y + radius);
+            } else if (entity.position) {
+                // For points and other simple entities
+                minX = Math.min(minX, entity.position.x);
+                minY = Math.min(minY, entity.position.y);
+                maxX = Math.max(maxX, entity.position.x);
+                maxY = Math.max(maxY, entity.position.y);
+            }
+        });
+
+        // Apply a scale factor - we default to assuming mm
+        const scaleFactor = 1; // You could determine this from header info in a more complete implementation
+
+        return {
+            width: Math.ceil((maxX - minX) * scaleFactor),
+            height: Math.ceil((maxY - minY) * scaleFactor),
+            minX: minX,
+            minY: minY,
+            maxX: maxX,
+            maxY: maxY
+        };
+    }
+
+    function renderDXFPreview(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dxfContent = e.target.result;
+                    const parser = new window.DxfParser();
+                    const dxfData = parser.parseSync(dxfContent);
+                    const canvas = document.getElementById('previewCanvas');
+                    drawDXFOnCanvas(canvas, dxfData);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = function() {
+                reject(new Error('Failed to read file'));
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    function drawDXFOnCanvas(canvas, dxfData) {
+        const ctx = canvas.getContext('2d');
+        
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (!dxfData || !dxfData.entities || !Array.isArray(dxfData.entities)) {
+            console.error("Invalid DXF data structure:", dxfData);
+            ctx.fillStyle = 'red';
+            ctx.font = '12px Arial';
+            ctx.fillText('Invalid DXF data', 10, 30);
+            return;
         }
+        
+        // Calculate dimensions to properly scale the preview
+        const dimensions = calculateDimensions(dxfData);
+        
+        // Calculate scale to fit the canvas
+        const padding = 10;
+        const scaleX = (canvas.width - padding * 2) / dimensions.width;
+        const scaleY = (canvas.height - padding * 2) / dimensions.height;
+        const scale = Math.min(scaleX, scaleY, 5); // Limit max scale to avoid too large drawings
+        
+        // Center the drawing
+        const offsetX = (canvas.width - dimensions.width * scale) / 2;
+        const offsetY = (canvas.height - dimensions.height * scale) / 2;
+        
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+        ctx.translate(-dimensions.minX, -dimensions.minY);
+        
+        // Set default drawing style
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1 / scale; // Adjust line width based on scale
+        
+        const entities = dxfData.entities;
+        entities.forEach(entity => {
+            try {
+                switch(entity.type) {
+                    case 'LINE':
+                        drawLine(ctx, entity);
+                        break;
+                    case 'CIRCLE':
+                        drawCircle(ctx, entity);
+                        break;
+                    case 'ARC':
+                        drawArc(ctx, entity);
+                        break;
+                    case 'POLYLINE':
+                    case 'LWPOLYLINE':
+                        drawPolyline(ctx, entity);
+                        break;
+                    case 'SPLINE':
+                        drawSpline(ctx, entity);
+                        break;
+                    case 'ELLIPSE':
+                        drawEllipse(ctx, entity);
+                        break;
+                    case 'POINT':
+                        drawPoint(ctx, entity);
+                        break;
+                    // Add support for other entity types as needed
+                    default:
+                        console.log("Unsupported entity type:", entity.type);
+                }
+            } catch (error) {
+                console.error(`Error rendering entity of type ${entity.type}:`, error);
+            }
+        });
+        
+        ctx.restore();
     }
-}
 
-function drawDXFOnCanvas(canvas, dxfData) {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const entities = dxfData.entities;
-    entities.forEach(entity => {
-        if (entity.type === 'LINE') {
+    function drawLine(ctx, entity) {
+        if (entity.vertices) {
             ctx.beginPath();
             ctx.moveTo(entity.vertices[0].x, entity.vertices[0].y);
             ctx.lineTo(entity.vertices[1].x, entity.vertices[1].y);
             ctx.stroke();
-        } else if (entity.type === 'CIRCLE') {
+        } else if (entity.start && entity.end) {
+            ctx.beginPath();
+            ctx.moveTo(entity.start.x, entity.start.y);
+            ctx.lineTo(entity.end.x, entity.end.y);
+            ctx.stroke();
+        }
+    }
+
+    function drawCircle(ctx, entity) {
+        if (entity.center && entity.radius) {
             ctx.beginPath();
             ctx.arc(entity.center.x, entity.center.y, entity.radius, 0, 2 * Math.PI);
             ctx.stroke();
-        } else if (entity.type === 'ARC') {
+        }
+    }
+
+    function drawArc(ctx, entity) {
+        if (entity.center && entity.radius && entity.startAngle !== undefined && entity.endAngle !== undefined) {
+            // Convert degrees to radians if necessary
+            const startAngle = entity.startAngle * (Math.PI / 180);
+            const endAngle = entity.endAngle * (Math.PI / 180);
+            
             ctx.beginPath();
-            ctx.arc(entity.center.x, entity.center.y, entity.radius, entity.startAngle, entity.endAngle);
+            ctx.arc(entity.center.x, entity.center.y, entity.radius, startAngle, endAngle);
             ctx.stroke();
-        } else if (entity.type === 'POLYLINE') {
+        }
+    }
+
+    function drawPolyline(ctx, entity) {
+        if (entity.vertices && entity.vertices.length > 0) {
             ctx.beginPath();
+            
             entity.vertices.forEach((vertex, index) => {
                 if (index === 0) {
                     ctx.moveTo(vertex.x, vertex.y);
                 } else {
-                    ctx.lineTo(vertex.x, vertex.y);
+                    // Support for bulge values in polylines (approximated as arcs)
+                    const prevVertex = entity.vertices[index - 1];
+                    if (prevVertex.bulge && prevVertex.bulge !== 0) {
+                        const bulge = prevVertex.bulge;
+                        const dx = vertex.x - prevVertex.x;
+                        const dy = vertex.y - prevVertex.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const height = (dist / 2) * bulge;
+                        
+                        // Use quadraticCurveTo as a simplified approximation
+                        const midX = (prevVertex.x + vertex.x) / 2;
+                        const midY = (prevVertex.y + vertex.y) / 2;
+                        
+                        // Perpendicular direction
+                        const perpX = -dy / dist;
+                        const perpY = dx / dist;
+                        
+                        const controlX = midX + perpX * height;
+                        const controlY = midY + perpY * height;
+                        
+                        ctx.quadraticCurveTo(controlX, controlY, vertex.x, vertex.y);
+                    } else {
+                        ctx.lineTo(vertex.x, vertex.y);
+                    }
                 }
             });
+            
             if (entity.closed) {
                 ctx.closePath();
             }
+            
             ctx.stroke();
         }
-    });
-}
+    }
+
+    function drawSpline(ctx, entity) {
+        // If the SPLINE already has approximated vertices, use them
+        if (entity.vertices && entity.vertices.length > 0) {
+            drawPolyline(ctx, entity);
+            return;
+        }
+        
+        // If we have control points, let's approximate the curve
+        if (entity.controlPoints && entity.controlPoints.length > 0) {
+            const points = entity.controlPoints;
+            const degree = entity.degree || 3;
+            
+            // Simple approximation - divide into segments
+            const segments = Math.max(20, points.length * 5);
+            
+            ctx.beginPath();
+            
+            // Draw approximated curve
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const point = approximateSplinePoint(t, points, degree);
+                
+                if (i === 0) {
+                    ctx.moveTo(point.x, point.y);
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            }
+            
+            ctx.stroke();
+        }
+    }
+
+    function drawEllipse(ctx, entity) {
+        if (entity.center && entity.majorAxis && entity.axisRatio) {
+            // Calculate major and minor axis lengths
+            const majorAxisLength = Math.sqrt(
+                entity.majorAxis.x * entity.majorAxis.x + 
+                entity.majorAxis.y * entity.majorAxis.y
+            );
+            
+            const minorAxisLength = majorAxisLength * entity.axisRatio;
+            
+            // Calculate rotation angle
+            const rotation = Math.atan2(entity.majorAxis.y, entity.majorAxis.x);
+            
+            // Draw the ellipse
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(entity.center.x, entity.center.y);
+            ctx.rotate(rotation);
+            ctx.scale(1, entity.axisRatio);
+            ctx.arc(0, 0, majorAxisLength, 0, 2 * Math.PI);
+            ctx.restore();
+            ctx.stroke();
+        }
+    }
+
+    function drawPoint(ctx, entity) {
+        if (entity.position) {
+            const pointSize = 3 / ctx.getTransform().a; // Adjust point size based on scale
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(entity.position.x, entity.position.y, pointSize, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    }
+
+    function approximateSplinePoint(t, controlPoints, degree) {
+        // Simple De Casteljau algorithm for Bezier curve approximation
+        if (degree === 1 || controlPoints.length === 1) {
+            return controlPoints[0];
+        }
+        
+        const newPoints = [];
+        for (let i = 0; i < controlPoints.length - 1; i++) {
+            newPoints.push({
+                x: (1 - t) * controlPoints[i].x + t * controlPoints[i + 1].x,
+                y: (1 - t) * controlPoints[i].y + t * controlPoints[i + 1].y
+            });
+        }
+        
+        return approximateSplinePoint(t, newPoints, degree - 1);
+    }
+
+    function loadSavedMaterials() {
+        const materialsList = document.getElementById('materialsList');
+        materialsList.innerHTML = '';
+        
+        // Load materials from localStorage
+        const materials = JSON.parse(localStorage.getItem('materials') || '[]');
+        
+        if (materials.length === 0) {
+            materialsList.innerHTML = '<div class="empty-state">No saved materials yet.</div>';
+            return;
+        }
+        
+        materials.forEach((material, index) => {
+            const materialElement = document.createElement('div');
+            materialElement.className = 'material-item';
+            
+            materialElement.innerHTML = `
+                <div class="material-info">
+                    <span class="material-name">${material.name}</span>
+                    <span class="material-dimensions">${material.width} mm × ${material.height} mm</span>
+                    ${material.description ? `<span class="material-description">${material.description}</span>` : ''}
+                </div>
+                <div class="material-actions">
+                    <button class="select-material" data-index="${index}">Select</button>
+                    <button class="delete-material" data-index="${index}">Delete</button>
+                </div>
+            `;
+            
+            materialsList.appendChild(materialElement);
+        });
+        
+        // Add event listeners to the buttons
+        document.querySelectorAll('.select-material').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                selectMaterial(materials[index]);
+                document.getElementById('manageMaterialsModal').style.display = 'none';
+            });
+        });
+        
+        document.querySelectorAll('.delete-material').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                materials.splice(index, 1);
+                localStorage.setItem('materials', JSON.stringify(materials));
+                loadSavedMaterials();
+                showToast("Material deleted", "info");
+            });
+        });
+    }
+
+    function selectMaterial(material) {
+        document.getElementById('sheetWidth').value = material.width;
+        document.getElementById('sheetHeight').value = material.height;
+        document.getElementById('materialCost').value = material.cost || 0;
+        document.getElementById('materialType').value = material.description || '';
+    }
+
+    function updateMaterialDropdown() {
+        const materialSelect = document.getElementById('materialSelect');
+        materialSelect.innerHTML = '';
+        const materials = JSON.parse(localStorage.getItem('materials') || '[]');
+        materials.forEach((material, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${material.name} (${material.width}×${material.height}mm)`;
+            materialSelect.appendChild(option);
+        });
+        materialSelect.onchange = function() {
+            if (this.value === 'custom') return;
+            const index = parseInt(this.value);
+            selectMaterial(materials[index]);
+        };
+    }
+
+    // Initialize materials on page load
+    function initializeMaterials() {
+        updateMaterialDropdown();
+    }
+
+    function renderDXFPreview(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dxfContent = e.target.result;
+                    const parser = new window.DxfParser();
+                    const dxfData = parser.parseSync(dxfContent);
+                    const canvas = document.getElementById('previewCanvas');
+                    drawDXFOnCanvas(canvas, dxfData);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = function() {
+                reject(new Error('Failed to read file'));
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    function addPartToList(filename, dxfData, quantity) {
+        // Create a unique ID for the part
+        const partId = 'part-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+        
+        // Convert quantity to number
+        const partQuantity = parseInt(quantity) || 1;
+        
+        // Ensure the parts list container is not in the "empty" state
+        const partsList = document.getElementById('partsList');
+        if (partsList.children.length === 1 && partsList.children[0].classList.contains('empty-state')) {
+            partsList.innerHTML = '';
+        }
+
+        // Extract entities and validate the DXF data
+        let entities = dxfData.entities || [];
+        
+        // Ensure we have valid dimensions
+        let dimensions;
+        try {
+            dimensions = calculateDimensions(dxfData);
+        } catch (error) {
+            console.error("Failed to calculate dimensions:", error);
+            showToast(`Failed to process part "${filename}": Invalid dimensions`, "error");
+            return;
+        }
+
+        // Create the part object
+        const part = {
+            id: partId,
+            filename: filename,
+            dimensions: dimensions,
+            quantity: partQuantity,
+            entities: entities,
+            dxfData: dxfData
+        };
+        
+        // Add the part to the internal list
+        partsList.push(part);
+        
+        // Create the part element in the UI
+        const partElement = document.createElement('div');
+        partElement.className = 'part-item';
+        partElement.id = partId;
+        
+        // Create preview canvas
+        const previewCanvas = document.createElement('canvas');
+        previewCanvas.width = 120;
+        previewCanvas.height = 120;
+        drawDXFOnCanvas(previewCanvas, dxfData);
+        
+        partElement.innerHTML = `
+            <div class="part-preview">
+                ${previewCanvas.outerHTML}
+            </div>
+            <div class="part-info">
+                <div class="part-name">${filename}</div>
+                <div class="part-dimensions">
+                    ${dimensions.width.toFixed(2)}mm × ${dimensions.height.toFixed(2)}mm
+                </div>
+                <div class="quantity-control-wrapper">
+                    <button class="quantity-control" onclick="decreaseQuantity('${partId}')">-</button>
+                    <span class="quantity" id="quantity-${partId}">${partQuantity}</span>
+                    <button class="quantity-control" onclick="increaseQuantity('${partId}')">+</button>
+                </div>
+            </div>
+            <div class="part-actions">
+                <button class="remove-part" onclick="removePart('${partId}')">Delete</button>
+            </div>
+        `;
+        
+        // Add event listeners for the part actions
+        partElement.querySelector('.remove-part').addEventListener('click', function() {
+            partsList.removeChild(partElement);
+            if (partsList.children.length === 0) {
+                partsList.innerHTML = '<div class="empty-state">No parts added yet. Add a DXF file below.</div>';
+            }
+            showToast(`Part "${filename}" removed`, "info");
+        });
+        
+        partsList.appendChild(partElement);
+    }
+
+    function calculateDimensions(dxfData) {
+        if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+            throw new Error("Invalid DXF data: No entities found");
+        }
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        // Iterate through all entities to find the bounding box
+        dxfData.entities.forEach(entity => {
+            if (entity.vertices) {
+                entity.vertices.forEach(vertex => {
+                    minX = Math.min(minX, vertex.x);
+                    minY = Math.min(minY, vertex.y);
+                    maxX = Math.max(maxX, vertex.x);
+                    maxY = Math.max(maxY, vertex.y);
+                });
+            } else if (entity.center) {
+                // For circles and arcs
+                const radius = entity.radius || 0;
+                minX = Math.min(minX, entity.center.x - radius);
+                minY = Math.min(minY, entity.center.y - radius);
+                maxX = Math.max(maxX, entity.center.x + radius);
+                maxY = Math.max(maxY, entity.center.y + radius);
+            } else if (entity.position) {
+                // For points and other simple entities
+                minX = Math.min(minX, entity.position.x);
+                minY = Math.min(minY, entity.position.y);
+                maxX = Math.max(maxX, entity.position.x);
+                maxY = Math.max(maxY, entity.position.y);
+            }
+        });
+
+        // Apply a scale factor - we default to assuming mm
+        const scaleFactor = 1; // You could determine this from header info in a more complete implementation
+
+        return {
+            width: Math.ceil((maxX - minX) * scaleFactor),
+            height: Math.ceil((maxY - minY) * scaleFactor),
+            minX: minX,
+            minY: minY,
+            maxX: maxX,
+            maxY: maxY
+        };
+    }
+
+    function removePart(partId) {
+        const partElement = document.querySelector(`[data-id='${partId}']`);
+        if (partElement) {
+            partElement.remove();
+            const partsList = document.getElementById('partsList');
+            if (partsList.children.length === 0) {
+                partsList.innerHTML = '<div class="empty-state">No parts added yet. Add a DXF file below.</div>';
+            }
+        }
+    }
+
+    function increaseQuantity(partId) {
+        const partElement = document.querySelector(`[data-id='${partId}']`);
+        if (partElement) {
+            const quantitySpan = partElement.querySelector('.part-quantity span');
+            let quantity = parseInt(quantitySpan.textContent);
+            quantity += 1;
+            quantitySpan.textContent = quantity;
+        }
+    }
+
+    function decreaseQuantity(partId) {
+        const partElement = document.querySelector(`[data-id='${partId}']`);
+        if (partElement) {
+            const quantitySpan = partElement.querySelector('.part-quantity span');
+            let quantity = parseInt(quantitySpan.textContent);
+            if (quantity > 1) {
+                quantity -= 1;
+                quantitySpan.textContent = quantity;
+            }
+        }
+    }
+
+    function drawDXFOnCanvas(canvas, dxfData) {
+        const ctx = canvas.getContext('2d');
+        
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (!dxfData || !dxfData.entities || !Array.isArray(dxfData.entities)) {
+            console.error("Invalid DXF data structure:", dxfData);
+            ctx.fillStyle = 'red';
+            ctx.font = '12px Arial';
+            ctx.fillText('Invalid DXF data', 10, 30);
+            return;
+        }
+        
+        // Calculate dimensions to properly scale the preview
+        const dimensions = calculateDimensions(dxfData);
+        
+        // Calculate scale to fit the canvas
+        const padding = 10;
+        const scaleX = (canvas.width - padding * 2) / dimensions.width;
+        const scaleY = (canvas.height - padding * 2) / dimensions.height;
+        const scale = Math.min(scaleX, scaleY, 5); // Limit max scale to avoid too large drawings
+        
+        // Center the drawing
+        const offsetX = (canvas.width - dimensions.width * scale) / 2;
+        const offsetY = (canvas.height - dimensions.height * scale) / 2;
+        
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+        ctx.translate(-dimensions.minX, -dimensions.minY);
+        
+        // Set default drawing style
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1 / scale; // Adjust line width based on scale
+        
+        const entities = dxfData.entities;
+        entities.forEach(entity => {
+            try {
+                switch(entity.type) {
+                    case 'LINE':
+                        drawLine(ctx, entity);
+                        break;
+                    case 'CIRCLE':
+                        drawCircle(ctx, entity);
+                        break;
+                    case 'ARC':
+                        drawArc(ctx, entity);
+                        break;
+                    case 'POLYLINE':
+                    case 'LWPOLYLINE':
+                        drawPolyline(ctx, entity);
+                        break;
+                    case 'SPLINE':
+                        drawSpline(ctx, entity);
+                        break;
+                    case 'ELLIPSE':
+                        drawEllipse(ctx, entity);
+                        break;
+                    case 'POINT':
+                        drawPoint(ctx, entity);
+                        break;
+                    // Add support for other entity types as needed
+                    default:
+                        console.log("Unsupported entity type:", entity.type);
+                }
+            } catch (error) {
+                console.error(`Error rendering entity of type ${entity.type}:`, error);
+            }
+        });
+        
+        ctx.restore();
+    }
+
+    function drawLine(ctx, entity) {
+        if (entity.vertices) {
+            ctx.beginPath();
+            ctx.moveTo(entity.vertices[0].x, entity.vertices[0].y);
+            ctx.lineTo(entity.vertices[1].x, entity.vertices[1].y);
+            ctx.stroke();
+        } else if (entity.start && entity.end) {
+            ctx.beginPath();
+            ctx.moveTo(entity.start.x, entity.start.y);
+            ctx.lineTo(entity.end.x, entity.end.y);
+            ctx.stroke();
+        }
+    }
+
+    function drawCircle(ctx, entity) {
+        if (entity.center && entity.radius) {
+            ctx.beginPath();
+            ctx.arc(entity.center.x, entity.center.y, entity.radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+    }
+
+    function drawArc(ctx, entity) {
+        if (entity.center && entity.radius && entity.startAngle !== undefined && entity.endAngle !== undefined) {
+            // Convert degrees to radians if necessary
+            const startAngle = entity.startAngle * (Math.PI / 180);
+            const endAngle = entity.endAngle * (Math.PI / 180);
+            
+            ctx.beginPath();
+            ctx.arc(entity.center.x, entity.center.y, entity.radius, startAngle, endAngle);
+            ctx.stroke();
+        }
+    }
+
+    function drawPolyline(ctx, entity) {
+        if (entity.vertices && entity.vertices.length > 0) {
+            ctx.beginPath();
+            
+            entity.vertices.forEach((vertex, index) => {
+                if (index === 0) {
+                    ctx.moveTo(vertex.x, vertex.y);
+                } else {
+                    // Support for bulge values in polylines (approximated as arcs)
+                    const prevVertex = entity.vertices[index - 1];
+                    if (prevVertex.bulge && prevVertex.bulge !== 0) {
+                        const bulge = prevVertex.bulge;
+                        const dx = vertex.x - prevVertex.x;
+                        const dy = vertex.y - prevVertex.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const height = (dist / 2) * bulge;
+                        
+                        // Use quadraticCurveTo as a simplified approximation
+                        const midX = (prevVertex.x + vertex.x) / 2;
+                        const midY = (prevVertex.y + vertex.y) / 2;
+                        
+                        // Perpendicular direction
+                        const perpX = -dy / dist;
+                        const perpY = dx / dist;
+                        
+                        const controlX = midX + perpX * height;
+                        const controlY = midY + perpY * height;
+                        
+                        ctx.quadraticCurveTo(controlX, controlY, vertex.x, vertex.y);
+                    } else {
+                        ctx.lineTo(vertex.x, vertex.y);
+                    }
+                }
+            });
+            
+            if (entity.closed) {
+                ctx.closePath();
+            }
+            
+            ctx.stroke();
+        }
+    }
+
+    function drawSpline(ctx, entity) {
+        // If the SPLINE already has approximated vertices, use them
+        if (entity.vertices && entity.vertices.length > 0) {
+            drawPolyline(ctx, entity);
+            return;
+        }
+        
+        // If we have control points, let's approximate the curve
+        if (entity.controlPoints && entity.controlPoints.length > 0) {
+            const points = entity.controlPoints;
+            const degree = entity.degree || 3;
+            
+            // Simple approximation - divide into segments
+            const segments = Math.max(20, points.length * 5);
+            
+            ctx.beginPath();
+            
+            // Draw approximated curve
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const point = approximateSplinePoint(t, points, degree);
+                
+                if (i === 0) {
+                    ctx.moveTo(point.x, point.y);
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            }
+            
+            ctx.stroke();
+        }
+    }
+
+    function drawEllipse(ctx, entity) {
+        if (entity.center && entity.majorAxis && entity.axisRatio) {
+            // Calculate major and minor axis lengths
+            const majorAxisLength = Math.sqrt(
+                entity.majorAxis.x * entity.majorAxis.x + 
+                entity.majorAxis.y * entity.majorAxis.y
+            );
+            
+            const minorAxisLength = majorAxisLength * entity.axisRatio;
+            
+            // Calculate rotation angle
+            const rotation = Math.atan2(entity.majorAxis.y, entity.majorAxis.x);
+            
+            // Draw the ellipse
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(entity.center.x, entity.center.y);
+            ctx.rotate(rotation);
+            ctx.scale(1, entity.axisRatio);
+            ctx.arc(0, 0, majorAxisLength, 0, 2 * Math.PI);
+            ctx.restore();
+            ctx.stroke();
+        }
+    }
+
+    function drawPoint(ctx, entity) {
+        if (entity.position) {
+            const pointSize = 3 / ctx.getTransform().a; // Adjust point size based on scale
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(entity.position.x, entity.position.y, pointSize, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    }
+
+    function approximateSplinePoint(t, controlPoints, degree) {
+        // Simple De Casteljau algorithm for Bezier curve approximation
+        if (degree === 1 || controlPoints.length === 1) {
+            return controlPoints[0];
+        }
+        
+        const newPoints = [];
+        for (let i = 0; i < controlPoints.length - 1; i++) {
+            newPoints.push({
+                x: (1 - t) * controlPoints[i].x + t * controlPoints[i + 1].x,
+                y: (1 - t) * controlPoints[i].y + t * controlPoints[i + 1].y
+            });
+        }
+        
+        return approximateSplinePoint(t, newPoints, degree - 1);
+    }
+});
