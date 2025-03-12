@@ -70,10 +70,12 @@ class DXFOptimizer {
     }
 
     async parseDXF(dxfContent) {
+        console.log("DXFOptimizer: Parsing DXF content");
         try {
             const parser = new DXFParser();
             this.dxfData = parser.parseSync(dxfContent);
             this.originalEntities = this.dxfData.entities || [];
+            console.log("DXFOptimizer: Parsed DXF data", this.dxfData);
 
             // Detect units and scale factor
             this.originalUnits = DXFUnits.detectFromHeader(this.dxfData.header);
@@ -102,10 +104,11 @@ class DXFOptimizer {
                 dimensions: this.itemBoundingBox,
                 units: this.getUnitName(),
                 scaleFactor: this.scaleFactor,
-                originalUnits: this.originalUnits
+                originalUnits: this.originalUnits,
+                entities: this.originalEntities // Add entities for rendering
             };
         } catch (error) {
-            console.error("Error parsing DXF:", error);
+            console.error("DXFOptimizer: Error parsing DXF", error);
             return {
                 success: false,
                 error: "Failed to parse DXF file. Make sure it's a valid DXF format."
@@ -200,6 +203,7 @@ class DXFOptimizer {
      * Optimize layout for multiple different parts with various quantities
      */
     optimizeMultipleParts(parts, sheetWidth, sheetHeight, allowRotation, allowMirroring, edgeGap, partSpacing) {
+        console.log("DXFOptimizer: Optimizing multiple parts", { parts, sheetWidth, sheetHeight, allowRotation, allowMirroring, edgeGap, partSpacing });
         this.sheetWidth = parseInt(sheetWidth);
         this.sheetHeight = parseInt(sheetHeight);
         this.allowRotation = allowRotation;
@@ -350,6 +354,7 @@ class DXFOptimizer {
             area + (part.dimensions.width * part.dimensions.height * part.quantity), 0);
         const utilization = usedArea / totalSheetArea;
         
+        console.log("DXFOptimizer: Optimization result", this.optimizedLayouts);
         return {
             totalItems: this.totalItems,
             totalSheets: this.optimizedLayouts.length,
@@ -1536,4 +1541,15 @@ class DXFWriter {
         
         return finalContent.join('\n');
     }
+}
+
+// Add the optimizeLayout function
+function optimizeLayout() {
+    console.log("optimizeLayout: Optimization started");
+    startProcessing();
+    // ...existing code...
+    setTimeout(() => {
+        console.log("optimizeLayout: Optimization completed");
+        stopProcessing();
+    }, 5000); // Adjust this timeout as needed
 }

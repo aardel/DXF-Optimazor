@@ -40,13 +40,77 @@ A web-based application designed to optimize the layout of DXF files for efficie
 
 ## Installation
 
-1. Clone the repository:
+1. Create a new directory for the project:
 ```bash
-git clone https://github.com/aardel/dxf-optimizer.git
+mkdir dxf-optimizer
 cd dxf-optimizer
 ```
 
-2. Open `src/index.html` in a web browser to access the application.
+2. Create the necessary folders:
+```bash
+mkdir -p src/css src/js assets/dxf-samples
+```
+
+3. Create the `index.html` file in the `src` folder:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF Optimizer</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- App content goes here -->
+    </div>
+    <script src="js/app.js"></script>
+</body>
+</html>
+```
+
+4. Create the `styles.css` file in the `src/css` folder:
+```css
+/* Add your styles here */
+body {
+    font-family: Arial, sans-serif;
+}
+```
+
+5. Create the `app.js` file in the `src/js` folder:
+```javascript
+// Add your JavaScript code here
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DXF Optimizer loaded');
+});
+```
+
+6. Create the `optimizer.js` file in the `src/js` folder:
+```javascript
+// Add your optimization logic here
+```
+
+7. Create the `sample-generator.html` file in the `assets` folder:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Generator</title>
+</head>
+<body>
+    <h1>Sample Generator</h1>
+    <script src="sample-generator.js"></script>
+</body>
+</html>
+```
+
+8. Create the `sample-generator.js` file in the `assets` folder:
+```javascript
+// Add your sample generation logic here
+```
 
 ## Usage
 
